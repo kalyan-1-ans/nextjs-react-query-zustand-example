@@ -99,11 +99,16 @@ export const MainNav = ({ withProfileMenu = true }: MainNavProps) => {
   return (
     <Navbar className="min-w-full rounded-none h-28 flex items-center px-1 md:pl-4 md:pr-12">
       <div className="relative flex w-full items-center justify-between text-blue-gray-900">
-        <Link href="/dashboard">
-          <Typography className="mr-4 md:ml-2 cursor-pointer py-1.5 font-medium">
-            <img className="mx-auto h-20" src="/logo.svg" alt="logo" />
-          </Typography>
-        </Link>
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <Link href="/dashboard">
+            <Typography className="mr-4 md:ml-2 cursor-pointer py-1.5 font-medium">
+              <img className="mx-auto h-20" src="/logo.svg" alt="logo" />
+            </Typography>
+          </Link>
+          <span className="max-w-36 rounded-full border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-semibold leading-tight text-amber-900 sm:max-w-none sm:text-sm">
+            React Query Version
+          </span>
+        </div>
         {withProfileMenu && (
           <div className="flex gap-4 md:gap-8 justify-center items-center">
             <WithBadge count={unreadData?.length || 0}>
