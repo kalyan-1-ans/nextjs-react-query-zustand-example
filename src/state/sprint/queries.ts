@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { IssueStatus } from '../issue/types';
 import { sprintApi } from './api';
 import { Sprint } from './type';
@@ -16,10 +16,11 @@ export const useSprintsQuery = <T = Sprint[]>({
   projectId: string;
   select?: (data: Sprint[]) => T;
 }) => {
-  return useQuery<T, Error>({
+  return useQuery<Sprint[], Error, T>({
     queryKey: sprintKeys.byProjectId(projectId),
-    queryFn: () => sprintApi.getSprints(projectId) as Promise<T>,
-    select: select as (data: T) => T,
+    queryFn: () => sprintApi.getSprints(projectId),
+    select,
+    enabled: !!projectId,
   });
 };
 
@@ -66,14 +67,12 @@ export const useActiveSprintIssuesByStatusQuery = ({
   projectId: string;
   status: IssueStatus;
 }) => {
-  const result = useActiveSprintQuery({ projectId });
-
-  return useMemo(() => {
-    const issues = result.data?.issues.filter(issue => issue.status === status);
-
-    return {
-      ...result,
-      data: issues,
-    };
-  }, [result, status]);
+  return useSprintsQuery({
+    projectId,
+    select: sprints =>
+      sprints
+        .find(sprint => sprint.status === 'ACTIVE')
+        ?.issues.filter(issue => issue.status === status)
+        .sort((a, b) => a.orderIndex - b.orderIndex) ?? [],
+  });
 };

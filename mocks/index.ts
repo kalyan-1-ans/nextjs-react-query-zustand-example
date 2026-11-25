@@ -1,19 +1,12 @@
-async function initMocks() {
-  console.log('Mocking APIs enabled');
-  if (typeof window === 'undefined') {
-    const { server } = await import('./node');
-    server.listen({
-      onUnhandledRequest: 'bypass',
-    });
-  } else {
-    const { worker } = await import('./browser');
+let initialization: Promise<unknown> | undefined;
+
+export function initMocks() {
+  if (typeof window === 'undefined') return Promise.resolve();
+  initialization ??= import('./browser').then(({ worker }) =>
     worker.start({
-      onUnhandledRequest: 'bypass',
+      onUnhandledFrame: 'bypass',
       quiet: true,
-    });
-  }
+    }),
+  );
+  return initialization;
 }
-
-initMocks();
-
-export {};

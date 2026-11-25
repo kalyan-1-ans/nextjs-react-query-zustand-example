@@ -1,3 +1,4 @@
+import type { User } from './types';
 import { axiosInstance } from '@/utils/axios.instance';
 
 const getUser = async (id: string) => {

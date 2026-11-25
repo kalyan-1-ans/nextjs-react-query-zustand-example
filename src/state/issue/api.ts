@@ -1,5 +1,5 @@
 import { axiosInstance } from '@/utils/axios.instance';
-import { Issue } from './types';
+import { Issue, CreateIssueRequest, UpdateIssueRequest } from './types';
 
 const getIssues = async (projectId: string) => {
   const { data } = await axiosInstance.get<Issue[]>(`/api/${projectId}/issues`);
@@ -11,7 +11,15 @@ const getIssuesCount = async (projectId: string) => {
   return data;
 };
 
-export const issuesAPi = {
-  getIssuesCount,
-  getIssues,
+const createIssue = async (projectId: string, issue: CreateIssueRequest) => {
+  const { data } = await axiosInstance.post<Issue>(`/api/${projectId}/issues`, issue);
+  return data;
 };
+const updateIssue = async (projectId: string, { id, ...issue }: UpdateIssueRequest) => {
+  const { data } = await axiosInstance.patch<Issue>(`/api/${projectId}/issues/${id}`, issue);
+  return data;
+};
+const deleteIssue = async (projectId: string, id: string) => {
+  await axiosInstance.delete(`/api/${projectId}/issues/${id}`);
+};
+export const issuesApi = { createIssue, updateIssue, deleteIssue, getIssuesCount, getIssues };

@@ -1,31 +1,21 @@
 import { http, HttpResponse } from 'msw';
-import { db } from '../data/db';
+import { db, saveDb } from '../data/db';
+import { NotificationStatus } from '../../src/state/notification/types';
 
 export const notificationHandlers = [
-  http.get('/api/:userId/notifications', async ({ params }) => {
-    const notifications = db.notification.findMany({
-      where: {
-        userId: {
-          equals: params.userId as string,
-        },
-      },
-    });
-
-    return HttpResponse.json(notifications);
-  }),
-
-  http.patch('/api/notifications/:notificationId/read', async ({ params }) => {
-    const notification = db.notification.update({
-      where: {
-        id: {
-          equals: params.notificationId as string,
-        },
-      },
-      data: {
-        status: 'Read',
-      },
-    });
-
+  http.get('*/api/:userId/notifications', ({ params }) =>
+    HttpResponse.json(
+      db.notifications.filter(notification => notification.userId === params.userId),
+    ),
+  ),
+  http.patch('*/api/notifications/:notificationId/read', ({ params }) => {
+    const notification = db.notifications.find(
+      notification => notification.id === params.notificationId,
+    );
+    if (!notification)
+      return HttpResponse.json({ errorMessage: 'Notification not found' }, { status: 404 });
+    notification.status = NotificationStatus.READ;
+    saveDb();
     return HttpResponse.json(notification);
   }),
 ];

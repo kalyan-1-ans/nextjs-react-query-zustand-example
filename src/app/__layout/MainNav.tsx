@@ -1,10 +1,10 @@
+import InitialsAvatar from '@/components/design-system/InitialsAvatar';
 import { NotificationPopover } from '@/components/NotificationPopover';
 import { useLogoutMutation } from '@/state/auth';
 import { useUnreadNotificationsQuery } from '@/state/notification';
 import { useCurrentUserQuery } from '@/state/user';
 import { BellIcon, ChevronDownIcon, PowerIcon, UserCircleIcon } from '@heroicons/react/24/solid';
 import {
-  Avatar,
   Badge,
   Button,
   IconButton,
@@ -14,13 +14,14 @@ import {
   MenuList,
   Navbar,
   Typography,
-} from '@material-tailwind/react';
+} from '@/components/design-system/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import React from 'react';
 
 function ProfileMenu() {
+  const { data: user } = useCurrentUserQuery();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const router = useRouter();
   const logoutMutation = useLogoutMutation();
@@ -39,17 +40,12 @@ function ProfileMenu() {
     <Menu open={isMenuOpen} handler={setIsMenuOpen} placement="bottom-end">
       <MenuHandler>
         <Button
+          aria-label="Open profile menu"
           variant="text"
           color="blue-gray"
           className="flex items-center gap-1 rounded-full py-0.5 pr-2 pl-0.5 lg:ml-auto"
         >
-          <Avatar
-            variant="circular"
-            size="sm"
-            alt="tania andrew"
-            className="border border-gray-900 p-0.5 h-20 w-20"
-            src="/avatar.svg"
-          />
+          <InitialsAvatar name={user?.name} size="40" />
           <ChevronDownIcon
             strokeWidth={2.5}
             className={`h-3 w-3 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
@@ -105,21 +101,21 @@ export const MainNav = ({ withProfileMenu = true }: MainNavProps) => {
       <div className="relative flex w-full items-center justify-between text-blue-gray-900">
         <Link href="/dashboard">
           <Typography className="mr-4 md:ml-2 cursor-pointer py-1.5 font-medium">
-            <img className="mx-auto h-32" src="/logo.svg" alt="logo" />
+            <img className="mx-auto h-20" src="/logo.svg" alt="logo" />
           </Typography>
         </Link>
         {withProfileMenu && (
-          <div className="flex gap-16 justify-center items-center">
+          <div className="flex gap-4 md:gap-8 justify-center items-center">
             <WithBadge count={unreadData?.length || 0}>
               <NotificationPopover>
-                <IconButton variant="text">
-                  <BellIcon color="black" className="h-10 w-10" />
+                <IconButton variant="text" aria-label="Notifications">
+                  <BellIcon color="black" className="h-6 w-6" />
                 </IconButton>
               </NotificationPopover>
             </WithBadge>
             <div className="flex gap-4 justify-center items-center">
               {!isLoading && (
-                <Typography color="blue-gray" variant="lead">
+                <Typography color="blue-gray" variant="lead" className="hidden sm:block">
                   {data?.name}
                 </Typography>
               )}

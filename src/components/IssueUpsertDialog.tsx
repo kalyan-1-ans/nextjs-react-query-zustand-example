@@ -1,3 +1,4 @@
+import { useProjectDialogs } from '@/components/project/useProjectDialogs';
 import * as yup from 'yup';
 
 import {
@@ -5,110 +6,105 @@ import {
   Dialog,
   DialogBody,
   DialogHeader,
+  DialogTitle,
   IconButton,
   Input,
   Option,
   Select,
   Textarea,
   Typography,
-} from '@material-tailwind/react';
+} from '@/components/design-system/ui';
 
 import { useUnCompletedSprintsQuery } from '../state/sprint';
 
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { useForm } from 'react-hook-form';
-import { issueDialog } from '../state/ui-dialog';
+import { useForm, useWatch } from 'react-hook-form';
 import { useUsersQuery } from '../state/user';
 import { ISSUE_TYPE_COLOR } from '../utils/constants';
 import { Divider } from './design-system/Divider';
 import { UserSelect } from './design-system/UserSelect';
 import { Issue, IssueStatus, IssueStatusEnum, IssueType, IssueTypeEnum } from '@/state/issue/types';
+import { useAuthStore } from '@/state/auth/store';
+import {
+  useCreateIssueMutation,
+  useUpdateIssueMutation,
+  useDeleteIssueMutation,
+} from '@/state/issue';
 import { useProjectIdParam } from '@/hooks/useProjectIdParam';
 
 const IssueTypeLabel = {
-  [IssueTypeEnum.Values.BUG]: 'Bug',
-  [IssueTypeEnum.Values.STORY]: 'Story',
+  [IssueTypeEnum.enum.BUG]: 'Bug',
+  [IssueTypeEnum.enum.STORY]: 'Story',
 };
 
 const IssueStatusLabel = {
-  [IssueStatusEnum.Values.TO_DO]: 'To Do',
-  [IssueStatusEnum.Values.IN_PROGRESS]: 'In Progress',
-  [IssueStatusEnum.Values.REVIEW]: 'Review',
-  [IssueStatusEnum.Values.DONE]: 'Done',
+  [IssueStatusEnum.enum.TO_DO]: 'To Do',
+  [IssueStatusEnum.enum.IN_PROGRESS]: 'In Progress',
+  [IssueStatusEnum.enum.REVIEW]: 'Review',
+  [IssueStatusEnum.enum.DONE]: 'Done',
 };
 
 const schema = yup.object({
-  summary: yup.string().required('Summary is required'),
+  summary: yup.string().trim().required('Summary is required'),
   description: yup.string().nullable(),
   reporterUserId: yup.string().required('Report cannot be unassigned'),
   assigneeUserId: yup.string().nullable(),
   sprintId: yup.string().nullable(),
   storyPoints: yup
     .number()
+    .typeError('Story points must be a number')
+    .min(0, 'Story points cannot be negative')
     .nullable()
     .transform((value, originalValue) => (String(originalValue).trim() === '' ? null : value)),
-  type: yup
-    .mixed()
-    .oneOf(
-      Object.values(IssueStatusEnum),
-      `Type must be one of: ${Object.values(IssueStatusEnum).join(', ')}`,
-    )
-    .required('Type is required')
-    .default(IssueTypeEnum.Values.STORY),
-  status: yup
-    .mixed()
-    .oneOf(
-      Object.values(IssueStatusEnum),
-      `Status must be one of: ${Object.values(IssueStatusEnum).join(', ')}`,
-    )
-    .required('Status is required')
-    .default(IssueStatusEnum.Values.TO_DO),
+  type: yup.mixed<IssueType>().oneOf(IssueTypeEnum.options).required().default('STORY'),
+  status: yup.mixed<IssueStatus>().oneOf(IssueStatusEnum.options).required().default('TO_DO'),
 });
 
 type FormValues = yup.InferType<typeof schema>;
 
 const UpsertIssueForm = ({ issue }: { issue?: Issue }) => {
-  const { closeDialog } = issueDialog.useDialogState();
+  const { closeDialog } = useProjectDialogs();
   const projectId = useProjectIdParam();
   const { data: usersData, isLoading: usersLoading } = useUsersQuery();
   const { data: sprintsData, isLoading: sprintLoading } = useUnCompletedSprintsQuery({
     projectId: projectId ?? '',
   });
-  // const [updateIssue, { loading: loadingUpdate }] = useUpdateIssueMutation();
-  // const [deleteIssue, { loading: loadingDelete }] = useDeleteIssueMutation();
-  // const [createIssue, { loading: loadingCreate }] = useCreateIssueMutation();
-
-  // const loading = loadingUpdate || loadingDelete || loadingCreate;
-  const loading = false;
+  const createMutation = useCreateIssueMutation();
+  const updateMutation = useUpdateIssueMutation();
+  const deleteMutation = useDeleteIssueMutation();
+  const currentUserId = useAuthStore.use.currentUserId();
+  const loadingUpdate = updateMutation.isPending;
+  const loadingDelete = deleteMutation.isPending;
+  const loadingCreate = createMutation.isPending;
+  const loading = loadingUpdate || loadingDelete || loadingCreate;
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     setValue,
-    watch,
-    getValues,
+    control,
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       assigneeUserId: issue?.assigneeUserId,
       description: issue?.description,
-      reporterUserId: issue?.reporterUserId,
+      reporterUserId: issue?.reporterUserId ?? currentUserId ?? '',
       sprintId: issue?.sprintId,
-      status: issue?.status ?? IssueStatusEnum.Values.TO_DO,
+      status: issue?.status ?? IssueStatusEnum.enum.TO_DO,
       storyPoints: issue?.storyPoints,
       summary: issue?.summary,
-      type: issue?.type ?? IssueTypeEnum.Values.STORY,
+      type: issue?.type ?? IssueTypeEnum.enum.STORY,
     },
     disabled: loading,
   });
 
-  const selectedReporterId = watch('reporterUserId');
-  const selectedAssigneeUserId = watch('assigneeUserId');
-  const selectedSprintId = watch('sprintId');
-  const selectedType = watch('type');
-  const selectedStatus = watch('status');
+  const selectedReporterId = useWatch({ control, name: 'reporterUserId' });
+  const selectedAssigneeUserId = useWatch({ control, name: 'assigneeUserId' });
+  const selectedSprintId = useWatch({ control, name: 'sprintId' });
+  const selectedType = useWatch({ control, name: 'type' });
+  const selectedStatus = useWatch({ control, name: 'status' });
 
   const onSubmit = (data: FormValues) => {
     if (issue?.id) {
@@ -118,50 +114,43 @@ const UpsertIssueForm = ({ issue }: { issue?: Issue }) => {
     }
   };
 
-  const handleCreateClick = (data: FormValues) => {
-    // createIssue({
-    //   ...data,
-    //   projectId,
-    //   status: data.status as IssueStatus,
-    //   type: data.type as IssueType,
-    // });
-  };
-
+  const normalize = (data: FormValues) => ({
+    ...data,
+    description: data.description ?? '',
+    storyPoints: data.storyPoints ?? 0,
+    assigneeUserId: data.assigneeUserId || null,
+    sprintId: data.sprintId || null,
+  });
+  const handleCreateClick = (data: FormValues) =>
+    createMutation.mutate(normalize(data), { onSuccess: closeDialog });
   const handleUpdateClick = (data: FormValues) => {
-    // updateIssue(
-    //   {
-    //     ...data,
-    //     status: data.status as IssueStatus,
-    //     type: data.type as IssueType,
-    //     id: issue?.id ?? '',
-    //     assigneeUserId: data.assigneeUserId || null,
-    //     sprintId: data.sprintId || null,
-    //   },
-    //   issue,
-    // );
+    if (issue)
+      updateMutation.mutate({ ...normalize(data), id: issue.id }, { onSuccess: closeDialog });
   };
-
   const handleDeleteClick = () => {
-    // deleteIssue(issue);
+    if (issue) deleteMutation.mutate(issue, { onSuccess: closeDialog });
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="false">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="off">
       <DialogHeader className="relative m-0 block">
         {issue?.type && (
           <div className="flex gap-2 items-center h-full mb-3">
             <div
               className={`w-5 h-5 ${
-                ISSUE_TYPE_COLOR[getValues().type as keyof typeof ISSUE_TYPE_COLOR]
+                ISSUE_TYPE_COLOR[selectedType as keyof typeof ISSUE_TYPE_COLOR]
               }`}
             />
             <Typography>{issue?.issueNumber}</Typography>
           </div>
         )}
-        <Typography variant="h4" color="blue-gray">
-          {issue?.id ? 'Update' : 'Create'} Issue
-        </Typography>
+        <DialogTitle>
+          <Typography variant="h4" color="blue-gray">
+            {issue?.id ? 'Update' : 'Create'} Issue
+          </Typography>
+        </DialogTitle>
         <IconButton
+          aria-label="Close dialog"
           size="sm"
           variant="text"
           className="!absolute right-3.5 top-3.5"
@@ -258,9 +247,10 @@ const UpsertIssueForm = ({ issue }: { issue?: Issue }) => {
               disabled={loading}
               containerProps={{ className: 'min-w-full' }}
             >
-              <Option value={undefined} className="h-8">
-                {' '}
-              </Option>
+              <Option value="">Backlog</Option>
+              {issue?.sprintId && !sprintsData?.some(sprint => sprint.id === issue.sprintId) && (
+                <Option value={issue.sprintId}>Completed sprint</Option>
+              )}
               {sprintsData?.map(sprint => (
                 <Option key={sprint.id} value={sprint.id}>
                   {sprint.name}
@@ -283,7 +273,7 @@ const UpsertIssueForm = ({ issue }: { issue?: Issue }) => {
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <Input
               label="Story points"
@@ -303,13 +293,13 @@ const UpsertIssueForm = ({ issue }: { issue?: Issue }) => {
               error={!!errors.type}
               selected={() => IssueTypeLabel[selectedType as IssueType]}
               disabled={loading}
-              containerProps={{ className: 'min-w-20 md:min-w-40' }}
+              containerProps={{ className: 'min-w-0' }}
             >
-              <Option value={IssueTypeEnum.Values.STORY}>
-                {IssueTypeLabel[IssueTypeEnum.Values.STORY]}
+              <Option value={IssueTypeEnum.enum.STORY}>
+                {IssueTypeLabel[IssueTypeEnum.enum.STORY]}
               </Option>
-              <Option value={IssueTypeEnum.Values.BUG}>
-                {IssueTypeLabel[IssueTypeEnum.Values.BUG]}
+              <Option value={IssueTypeEnum.enum.BUG}>
+                {IssueTypeLabel[IssueTypeEnum.enum.BUG]}
               </Option>
             </Select>
           </div>
@@ -321,7 +311,7 @@ const UpsertIssueForm = ({ issue }: { issue?: Issue }) => {
               error={!!errors.type}
               selected={() => IssueStatusLabel[selectedStatus as IssueStatus]}
               disabled={loading}
-              containerProps={{ className: 'min-w-20 md:min-w-40' }}
+              containerProps={{ className: 'min-w-0' }}
             >
               {Object.entries(IssueStatusLabel).map(([key, label]) => (
                 <Option value={key} key={key}>
@@ -376,7 +366,9 @@ const UpsertIssueForm = ({ issue }: { issue?: Issue }) => {
 };
 
 export function IssueUpsertDialog() {
-  const { isOpen, data, closeDialog } = issueDialog.useDialogState();
+  const { dialog, closeDialog } = useProjectDialogs();
+  const isOpen = dialog?.type === 'issue';
+  const data = dialog?.type === 'issue' ? dialog.issue : undefined;
 
   return (
     <Dialog
@@ -386,7 +378,7 @@ export function IssueUpsertDialog() {
       className="p-4"
       dismiss={{ outsidePress: false }}
     >
-      <UpsertIssueForm issue={data} />
+      {isOpen && <UpsertIssueForm key={data?.id ?? 'new'} issue={data} />}
     </Dialog>
   );
 }

@@ -1,35 +1,37 @@
-import { useMutation } from '@tanstack/react-query';
-import { authApi } from '@/state/auth/api';
-import { LoginRequest, LoginResponse } from './types';
-import { useAuthStore } from './store';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useUIPreferenceStore } from '../ui-preference';
-import { AxiosError } from 'axios';
+import { authApi } from './api';
+import type { LoginRequest } from './types';
+import { useAuthStore } from './store';
+import { usePreferenceStore } from '../preference';
+import { useToastState } from '@/components/design-system/toast';
 
-export const useLoginMutation = () => {
+export function useLoginMutation() {
   const router = useRouter();
+  const client = useQueryClient();
   const { loginSuccess, clearAuth } = useAuthStore.use.actions();
-  const lastVisitedProjectId = useUIPreferenceStore.use.lastVisitedProjectId();
-
-  return useMutation<LoginResponse, AxiosError, LoginRequest>({
-    mutationFn: (loginRequest: LoginRequest) => authApi.login(loginRequest),
-    onSuccess(data) {
+  const projectId = usePreferenceStore.use.lastVisitedProjectId();
+  return useMutation({
+    mutationFn: (input: LoginRequest) => authApi.login(input),
+    onSuccess: data => {
+      client.clear();
       loginSuccess(data);
-      router.push(lastVisitedProjectId ? `/project/${lastVisitedProjectId}/issues` : '/dashboard');
+      router.replace(projectId ? `/project/${projectId}` : '/dashboard');
     },
     onError: () => clearAuth(),
   });
-};
-
-export const useLogoutMutation = () => {
+}
+export function useLogoutMutation() {
   const router = useRouter();
-  const { clearAuth } = useAuthStore.use.actions();
-
+  const client = useQueryClient();
   return useMutation({
     mutationFn: () => authApi.logout(),
-    onMutate: () => {
-      clearAuth();
-      router.push('/login');
+    onSettled: async () => {
+      await client.cancelQueries();
+      client.clear();
+      useAuthStore.getState().actions.clearAuth();
+      useToastState.getState().clearToasts();
+      router.replace('/login');
     },
   });
-};
+}

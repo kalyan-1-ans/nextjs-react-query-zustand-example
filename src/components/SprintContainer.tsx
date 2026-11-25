@@ -1,4 +1,5 @@
-import { Button, Chip, Typography } from '@material-tailwind/react';
+import { useProjectDialogs } from '@/components/project/useProjectDialogs';
+import { Button, Chip, Typography } from '@/components/design-system/ui';
 
 import { closestCenter, DndContext, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -6,17 +7,17 @@ import cx from 'classnames';
 import { format } from 'date-fns';
 import { useActiveSprintQuery } from '../state/sprint';
 import { useCompleteSprintMutation, useStartSprintMutation } from '../state/sprint/mutations';
-import { sprintCompleteWarningDialog, sprintStartWarningDialog } from '../state/ui-dialog';
 import { SprintIssueSortableItem } from './SprintIssueSortableItem';
 import { Issue, IssueStatusEnum } from '@/state/issue/types';
 import { SprintStatus } from '@/state/sprint/type';
+import { useUpdateIssueOrderMutation } from '@/state/issue';
 import { useProjectIdParam } from '@/hooks/useProjectIdParam';
 
 interface SprintContainerProps {
   sprintId?: string;
   name: string;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: string;
+  endDate?: string;
   goal?: string;
   issues?: Issue[] | null;
   status?: SprintStatus;
@@ -27,27 +28,30 @@ export const SprintContainer = ({
   startDate,
   endDate,
   goal,
-  issues,
+  issues: unsortedIssues,
   status,
   sprintId,
 }: SprintContainerProps) => {
-  const { openDialog: openCompleteWarningDialog } = sprintCompleteWarningDialog.useDialogState();
-  const { openDialog: openStartWarningDialog } = sprintStartWarningDialog.useDialogState();
-  // const [completeSprint, { loading: loadingCompelte }] = useCompleteSprintMutation();
-  const loadingCompelte = false;
-  // const [startSprint, { loading: loadingStart }] = useStartSprintMutation();
-  const loadingStart = false;
+  const issues = unsortedIssues
+    ? [...unsortedIssues].sort((a, b) => a.orderIndex - b.orderIndex)
+    : unsortedIssues;
+  const {
+    showCompleteSprintWarning: openCompleteWarningDialog,
+    showStartSprintWarning: openStartWarningDialog,
+  } = useProjectDialogs();
+  const { mutate: completeSprint, isPending: loadingComplete } = useCompleteSprintMutation();
+  const { mutate: startSprint, isPending: loadingStart } = useStartSprintMutation();
   const projectId = useProjectIdParam();
   const { data } = useActiveSprintQuery({ projectId });
-  // const [updateIssueOrder] = useUpdateIssueOrderMutation();
+  const { reorder, isPending: reordering } = useUpdateIssueOrderMutation();
 
   const handleCompleteSprint = () => {
     const hasPendingIssues =
-      issues?.some(issue => issue.status !== IssueStatusEnum.Values.DONE) ?? false;
+      issues?.some(issue => issue.status !== IssueStatusEnum.enum.DONE) ?? false;
     if (hasPendingIssues) {
       openCompleteWarningDialog();
     } else {
-      // completeSprint(sprintId ?? '');
+      completeSprint(sprintId ?? '');
     }
   };
 
@@ -55,29 +59,29 @@ export const SprintContainer = ({
     if (data) {
       openStartWarningDialog();
     } else {
-      // startSprint(sprintId ?? '');
+      startSprint(sprintId ?? '');
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) {
+    if (reordering || status === 'COMPLETED' || !over || active.id === over.id) {
       return;
     }
-    // updateIssueOrder({
-    //   activeIssueId: String(active.id),
-    //   overIssueId: String(over.id),
-    //   issues: issues ?? [],
-    // });
+    reorder({
+      activeIssueId: String(active.id),
+      overIssueId: String(over.id),
+      issues: issues ?? [],
+    });
   };
 
   return (
     <div
-      className={cx('p-4 bg-gray-200 flex flex-col gap-1', {
+      className={cx('p-4 bg-gray-200 flex flex-col gap-1 overflow-x-auto', {
         'text-gray-500': status === 'COMPLETED',
       })}
     >
-      <div className="text-sm flex gap-3">
+      <div className="text-sm flex flex-wrap gap-3">
         <Typography as="h3" className={cx('text-sm font-semibold tracking-wider m-0')}>
           {name}
         </Typography>
@@ -106,7 +110,7 @@ export const SprintContainer = ({
             variant="outlined"
             className="ml-auto"
             onClick={handleCompleteSprint}
-            loading={loadingCompelte}
+            loading={loadingComplete}
           >
             Complete Sprint
           </Button>
@@ -141,7 +145,7 @@ export const SprintContainer = ({
             >
               <tbody>
                 {issues?.map((issue, index) => {
-                  const isLast = issues?.length ?? 0 - 1 === index;
+                  const isLast = index === issues.length - 1;
                   const classes = isLast ? 'py-4' : 'py-4 border-b border-gray-500';
                   return <SprintIssueSortableItem key={issue.id} issue={issue} classes={classes} />;
                 })}

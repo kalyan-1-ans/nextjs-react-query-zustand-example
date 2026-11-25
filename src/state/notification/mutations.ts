@@ -1,23 +1,26 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationApi } from './api';
 import { notificationsKeys } from './queries';
-import { Notification } from './types';
+import { NotificationStatus, type Notification } from './types';
+import { useAuthStore } from '../auth/store';
 
-export const useMarkAsReadMutation = () => {
-  const queryClient = useQueryClient();
-
+export function useMarkAsReadMutation() {
+  const client = useQueryClient();
+  const userId = useAuthStore.use.currentUserId() ?? '';
+  const key = notificationsKeys.byUser(userId);
   return useMutation({
-    mutationFn: (notificationId: string) => notificationApi.markAsRead(notificationId),
-    onMutate: async (notificationId: string) => {
-      const previousNotifications = queryClient.getQueryData<Notification[]>(notificationsKeys.all);
-      const updatedNotifications = previousNotifications?.map(notification =>
-        notification.id === notificationId ? { ...notification, status: 'read' } : notification,
+    mutationFn: notificationApi.markAsRead,
+    onMutate: async id => {
+      await client.cancelQueries({ queryKey: key });
+      const previous = client.getQueryData<Notification[]>(key);
+      client.setQueryData<Notification[]>(key, old =>
+        old?.map(item => (item.id === id ? { ...item, status: NotificationStatus.READ } : item)),
       );
-      queryClient.setQueryData(notificationsKeys.all, updatedNotifications);
-      return { previousNotifications };
+      return { previous };
     },
-    onError: (err, notificationId, context) => {
-      queryClient.setQueryData(notificationsKeys.all, context?.previousNotifications);
+    onError: (_error, _id, context) => {
+      if (context?.previous) client.setQueryData(key, context.previous);
     },
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
   });
-};
+}

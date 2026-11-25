@@ -1,4 +1,4 @@
-import { Card, List, ListItem, ListItemPrefix } from '@material-tailwind/react';
+import { Card, List, ListItem, ListItemPrefix } from '@/components/design-system/ui';
 import { PresentationChartBarIcon, QueueListIcon } from '@heroicons/react/24/solid';
 import { usePathname, useRouter } from 'next/navigation';
 import { useProjectIdParam } from '@/hooks/useProjectIdParam';
@@ -12,11 +12,11 @@ export function SideNav() {
   const { data } = useActiveSprintQuery({ projectId: projectId ?? '' });
 
   const handleActive = () => {
-    router.push('./active');
+    router.push(`/project/${projectId}/active`);
   };
 
   const handleIssuesClick = () => {
-    router.push('./issues');
+    router.push(`/project/${projectId}`);
   };
 
   return (
@@ -28,7 +28,10 @@ export function SideNav() {
           </ListItemPrefix>
           Active Sprint
         </ListItem>
-        <ListItem onClick={handleIssuesClick} selected={pathNode === 'issues'}>
+        <ListItem
+          onClick={handleIssuesClick}
+          selected={pathNode === projectId || pathNode === 'issues'}
+        >
           <ListItemPrefix>
             <QueueListIcon className="h-5 w-5" />
           </ListItemPrefix>

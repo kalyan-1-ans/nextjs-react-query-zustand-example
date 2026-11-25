@@ -1,10 +1,8 @@
 import { axiosInstance } from '@/utils/axios.instance';
 import { CreateSprintRequest, Sprint } from './type';
 
-const getSprints = async (projectId: string, sprintId: string) => {
-  const { data } = await axiosInstance.get<Sprint[]>(
-    `/api/projects/${projectId}sprints/${sprintId}`,
-  );
+const getSprints = async (projectId: string) => {
+  const { data } = await axiosInstance.get<Sprint[]>(`/api/projects/${projectId}/sprints`);
   return data;
 };
 
@@ -15,7 +13,7 @@ const createSprint = async (projectId: string, sprint: CreateSprintRequest) => {
 
 const updateSprint = async (projectId: string, sprint: Partial<Sprint>) => {
   const { data } = await axiosInstance.patch<Sprint>(
-    `/api/projects/${projectId}sprints/${sprint.id}`,
+    `/api/projects/${projectId}/sprints/${sprint.id}`,
     sprint,
   );
   return data;

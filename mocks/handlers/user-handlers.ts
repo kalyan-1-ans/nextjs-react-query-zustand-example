@@ -1,35 +1,25 @@
 import { http, HttpResponse } from 'msw';
-import { db } from '../data/db';
+import { z } from 'zod';
+import { db, saveDb } from '../data/db';
+import type { User } from '../../src/state/user/types';
+const publicUser = ({ id, email, name }: User) => ({ id, email, name });
 
 export const userHandlers = [
-  http.get('/api/users/:id', async ({ params }) => {
-    const user = db.user.findFirst({
-      where: {
-        id: {
-          equals: params.id as string,
-        },
-      },
-    });
-
-    if (user) {
-      return HttpResponse.json(user);
-    }
-    return HttpResponse.json({ errorMessage: 'User not found' }, { status: 404 });
+  http.get('*/api/users', () => HttpResponse.json(db.users.map(publicUser))),
+  http.get('*/api/users/:id', ({ params }) => {
+    const user = db.users.find(user => user.id === params.id);
+    return user
+      ? HttpResponse.json(publicUser(user))
+      : HttpResponse.json({ errorMessage: 'User not found' }, { status: 404 });
   }),
-
-  http.get('/api/users', async () => {
-    const users = db.user.getAll();
-    return HttpResponse.json(users);
-  }),
-
-  http.patch('/api/users/:id', async ({ params, request }) => {
-    const body: any = await request.json();
-    const user = db.user.update({
-      where: {
-        id: { equals: params.id as string },
-      },
-      data: body,
-    });
-    return HttpResponse.json(user);
+  http.patch('*/api/users/:id', async ({ params, request }) => {
+    const user = db.users.find(user => user.id === params.id);
+    if (!user) return HttpResponse.json({ errorMessage: 'User not found' }, { status: 404 });
+    const parsed = z.object({ name: z.string().trim().min(1) }).safeParse(await request.json());
+    if (!parsed.success)
+      return HttpResponse.json({ errorMessage: 'Name is required' }, { status: 400 });
+    user.name = parsed.data.name;
+    saveDb();
+    return HttpResponse.json(publicUser(user));
   }),
 ];

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import { issuesAPi } from './api';
+import { issuesApi } from './api';
 
 export const issuesKeys = {
   all: ['issues'] as const,
@@ -9,23 +8,18 @@ export const issuesKeys = {
 };
 
 export const useBacklogIssuesQuery = (projectId: string) => {
-  const result = useQuery({
+  return useQuery({
     queryKey: issuesKeys.byProjectId(projectId),
-    queryFn: () => issuesAPi.getIssues(projectId),
+    queryFn: () => issuesApi.getIssues(projectId),
+    enabled: !!projectId,
+    select: issues => [...issues].sort((a, b) => a.orderIndex - b.orderIndex),
   });
-
-  return useMemo(() => {
-    const sortedIssues = [...(result.data ?? [])].sort((a, b) => a.orderIndex - b.orderIndex);
-    return {
-      ...result,
-      data: sortedIssues,
-    };
-  }, [result]);
 };
 
 export const useIssuesCountByProjectId = (projectId: string) => {
   return useQuery({
     queryKey: issuesKeys.count(projectId),
-    queryFn: () => issuesAPi.getIssuesCount(projectId),
+    queryFn: () => issuesApi.getIssuesCount(projectId),
+    enabled: !!projectId,
   });
 };

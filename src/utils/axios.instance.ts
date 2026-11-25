@@ -1,13 +1,9 @@
-import { useAuthStore } from '@/state/auth';
-import axios, { InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '@/state/auth/store';
+import axios from 'axios';
 
-const addAuthentication = async (axiosConfig: InternalAxiosRequestConfig) => {
+export const axiosInstance = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_BASE_URL });
+axiosInstance.interceptors.request.use(config => {
   const accessToken = useAuthStore.getState().accessToken;
-  axiosConfig.headers.Authorization = `Bearer ${accessToken}`;
-  return axiosConfig;
-};
-
-const axiosInstance = axios.create();
-axiosInstance.interceptors.request.use(addAuthentication);
-
-export { axiosInstance };
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  return config;
+});

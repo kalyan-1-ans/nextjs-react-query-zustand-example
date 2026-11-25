@@ -6,14 +6,14 @@ export const IssueTypeEnum = z.enum(['BUG', 'STORY']);
 export const issueSchema = z.object({
   id: z.string(),
   issueNumber: z.string(),
-  summary: z.string(),
+  summary: z.string().trim().min(1),
   description: z.string(),
   projectId: z.string(),
   assigneeUserId: z.string().nullable(),
   reporterUserId: z.string(),
   status: IssueStatusEnum,
   type: IssueTypeEnum,
-  storyPoints: z.number(),
+  storyPoints: z.number().nonnegative().finite(),
   sprintId: z.string().nullable(),
   orderIndex: z.number(),
 });
@@ -21,3 +21,6 @@ export const issueSchema = z.object({
 export type IssueStatus = z.infer<typeof IssueStatusEnum>;
 export type IssueType = z.infer<typeof IssueTypeEnum>;
 export type Issue = z.infer<typeof issueSchema>;
+
+export type CreateIssueRequest = Omit<Issue, 'id' | 'issueNumber' | 'projectId' | 'orderIndex'>;
+export type UpdateIssueRequest = Partial<CreateIssueRequest> & { id: string; orderIndex?: number };

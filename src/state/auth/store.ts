@@ -1,57 +1,41 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import { LoginResponse } from './types';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import type { LoginResponse } from './types';
 import { createSelectors } from '@/utils/zustand.helper';
 
 type AuthState = {
-  accessToken: string | undefined;
+  accessToken?: string;
+  currentUserId?: string;
   isAuthenticated: boolean;
-  currentUserId: string | undefined;
+  actions: {
+    loginSuccess: (response: LoginResponse) => void;
+    clearAuth: () => void;
+  };
 };
 
-type AuthAction = {
-  loginSuccess: (loginResponse: LoginResponse) => void;
-  clearAuth: () => void;
-};
-
-const initState: AuthState = {
-  accessToken: undefined,
-  isAuthenticated: false,
-  currentUserId: undefined,
-};
-
-type AuthStateAndAction = AuthState & { actions: AuthAction };
-
-const useAuthStoreBase = create<AuthStateAndAction>()(
-  immer(
-    devtools(
+export const useAuthStore = createSelectors(
+  create<AuthState>()(
+    persist(
       set => ({
-        ...initState,
+        accessToken: undefined,
+        currentUserId: undefined,
+        isAuthenticated: false,
         actions: {
-          loginSuccess: (loginResponse: LoginResponse) => {
-            set(state => {
-              state.accessToken = loginResponse.accessToken;
-              state.currentUserId = loginResponse.currentUserId;
-              state.isAuthenticated = true;
-            });
-          },
-          clearAuth: () => {
-            set(state => {
-              state.accessToken = undefined;
-              state.currentUserId = undefined;
-              state.isAuthenticated = false;
-            });
-          },
+          loginSuccess: response => set({ ...response, isAuthenticated: true }),
+          clearAuth: () =>
+            set({ accessToken: undefined, currentUserId: undefined, isAuthenticated: false }),
         },
       }),
       {
-        enabled: true,
-        name: 'auth-store',
-        store: 'auth-store',
+        name: 'demo-auth',
+        storage: createJSONStorage(() => sessionStorage),
+        skipHydration: true,
+        partialize: ({ accessToken, currentUserId, isAuthenticated }) => ({
+          accessToken,
+          currentUserId,
+          isAuthenticated,
+        }),
       },
     ),
   ),
 );
-
-export const useAuthStore = createSelectors(useAuthStoreBase);

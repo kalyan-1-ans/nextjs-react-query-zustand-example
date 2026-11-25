@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useAuthStore } from '../auth';
 import { useQuery } from '@tanstack/react-query';
 import { userApi } from './api';
@@ -17,20 +16,10 @@ export const useUsersQuery = () => {
 
 export const useCurrentUserQuery = () => {
   const currentUserId = useAuthStore.use.currentUserId() ?? '';
-  const result = useQuery({
+  return useQuery({
     queryKey: userKeys.user(currentUserId),
     queryFn: () => userApi.getUser(currentUserId),
+    enabled: !!currentUserId,
+    select: user => ({ ...user, firstName: user.name.split(' ')[0] }),
   });
-
-  return useMemo(() => {
-    const firstName = result.data?.name.split(' ')[0];
-
-    return {
-      ...result,
-      data: {
-        ...result.data,
-        firstName,
-      },
-    };
-  }, [result]);
 };

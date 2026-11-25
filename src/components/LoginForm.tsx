@@ -8,10 +8,11 @@ import {
   CardFooter,
   CardHeader,
   Typography,
-} from '@material-tailwind/react';
+} from '@/components/design-system/ui';
 
 import { useForm } from 'react-hook-form';
 import { useLoginMutation } from '../state/auth';
+import { getErrorMessage } from '@/utils/client.helper';
 import { yupResolver } from '@hookform/resolvers/yup';
 
 const schema = yup.object({
@@ -26,7 +27,6 @@ type FormValues = yup.InferType<typeof schema>;
 
 export const LoginForm = () => {
   const { mutate, isPending, error } = useLoginMutation();
-  const apiErrorData: any = error?.response?.data;
 
   const {
     register,
@@ -48,17 +48,15 @@ export const LoginForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="false">
-      <Card className="w-96">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="off">
+      <Card className="w-full max-w-sm">
         <CardHeader variant="gradient" color="gray" className="mb-4 grid h-28 place-items-center">
           <Typography variant="h3" color="white">
-            Login In
+            Log In
           </Typography>
         </CardHeader>
         <CardBody className="flex flex-col gap-4">
-          {apiErrorData?.errorMessage && (
-            <p className="text-sm text-red-500 mb-2">{apiErrorData?.errorMessage}</p>
-          )}
+          {error && <p className="text-sm text-red-500 mb-2">{getErrorMessage(error)}</p>}
           <div>
             <Input
               type="email"
@@ -86,7 +84,7 @@ export const LoginForm = () => {
         </CardBody>
         <CardFooter className="pt-0">
           <Button variant="gradient" fullWidth type="submit" loading={isPending}>
-            Login In
+            Log In
           </Button>
         </CardFooter>
       </Card>

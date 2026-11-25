@@ -1,93 +1,96 @@
-import { factory, primaryKey } from '@mswjs/data';
-import { faker } from '@faker-js/faker';
 import userData from './users.json';
 import projectData from './projects.json';
 import issueData from './issues.json';
 import sprintData from './sprints.json';
+import { issueSchema, type Issue } from '../../src/state/issue/types';
+import { sprintSchema, type Sprint } from '../../src/state/sprint/type';
+import { NotificationStatus, type Notification } from '../../src/state/notification/types';
+import type { Project } from '../../src/state/project/types';
+import type { User } from '../../src/state/user/types';
 
-export const db = factory({
-  user: {
-    id: primaryKey(faker.string.uuid),
-    email: () => faker.internet.email(),
-    password: () => 'Summertime2025',
-    name: () => faker.person.fullName(),
-  },
-  project: {
-    id: primaryKey(faker.string.uuid),
-    name: () => faker.lorem.words(3),
-    ownerId: String,
-  },
-  issue: {
-    id: primaryKey(faker.string.uuid),
-    issueNumber: String,
-    summary: () => faker.lorem.words(5),
-    description: () => faker.lorem.paragraph(),
-    projectId: String,
-    assigneeUserId: String,
-    reporterUserId: String,
-    status: () => faker.helpers.arrayElement(['TO_DO', 'IN_PROGRESS', 'DONE', 'REVIEW']) as string,
-    type: () => faker.helpers.arrayElement(['BUG', 'STORY']) as string,
-    storyPoints: () => faker.helpers.arrayElement([1, 2, 3, 5, 8, 13]) as number,
-    sprintId: String,
-    orderIndex: Number,
-  },
-  sprint: {
-    id: primaryKey(faker.string.uuid),
-    name: () => faker.lorem.words(2),
-    projectId: String,
-    goal: () => faker.lorem.sentence(),
-    startDate: () => faker.date.recent().toISOString(),
-    endDate: () => faker.date.future().toISOString(),
-    status: () => faker.helpers.arrayElement(['ACTIVE', 'COMPLETED', 'PLANNED']) as string,
-  },
-  notification: {
-    id: primaryKey(faker.string.uuid),
-    userId: String,
-    message: () => faker.lorem.sentence(),
-    status: String,
-  },
-});
-
-for (const user of userData) {
-  db.user.create(user);
+type DemoUser = User & { password: string };
+type Database = {
+  users: DemoUser[];
+  projects: Project[];
+  issues: Issue[];
+  sprints: Omit<Sprint, 'issues'>[];
+  notifications: Notification[];
+};
+const storageKey = 'sprint-board-demo-v1';
+function seed(): Database {
+  const issues = issueData.map((issue, index) =>
+    issueSchema.parse({
+      ...issue,
+      sprintId: issue.sprintId || null,
+      assigneeUserId: issue.assigneeUserId || null,
+      orderIndex: index + 1,
+    }),
+  );
+  return {
+    users: structuredClone(userData),
+    projects: structuredClone(projectData),
+    issues,
+    sprints: sprintData.map(sprint => {
+      const parsed = sprintSchema.parse({ ...sprint, issues: [] });
+      // Seed completed sprints with completed work.
+      if (parsed.status === 'COMPLETED')
+        issues
+          .filter(issue => issue.sprintId === parsed.id)
+          .forEach(issue => {
+            issue.status = 'DONE';
+          });
+      return parsed;
+    }),
+    notifications: issues
+      .filter(issue => issue.assigneeUserId)
+      .map(issue => ({
+        id: `assignment-${issue.id}`,
+        userId: issue.assigneeUserId!,
+        message: `${issue.issueNumber} has been assigned to you.`,
+        status: NotificationStatus.UNREAD,
+      })),
+  };
 }
-
-for (const project of projectData) {
-  db.project.create(project);
+function load(): Database {
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) return JSON.parse(saved) as Database;
+    } catch {
+      /* Use fresh demo data when storage is unavailable. */
+    }
+  }
+  return seed();
 }
-
-function highestOrderIndex(projectId: string, sprintId?: string) {
-  const maxOrderIndex = db.issue
-    .findMany({
-      where: {
-        projectId: {
-          equals: projectId,
-        },
-        sprintId: {
-          equals: sprintId,
-        },
-      },
-    })
-    .reduce((max, issue) => (issue.orderIndex > max ? issue.orderIndex : max), 0);
-
-  return maxOrderIndex;
-}
-
-for (let i = 0; i < issueData.length; i++) {
-  const issue = issueData[i];
-  db.issue.create({
-    ...issue,
-    orderIndex: highestOrderIndex(issue.projectId, issue.sprintId) + 1,
-  });
-  if (issue.assigneeUserId) {
-    db.notification.create({
-      message: `${issue.issueNumber} has been assigned to you.`,
-      userId: issue.assigneeUserId,
-      status: 'UNREAD',
-    });
+export const db = load();
+export function saveDb() {
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(db));
+    } catch {
+      /* Demo can still run in memory. */
+    }
   }
 }
-
-for (const sprint of sprintData) {
-  db.sprint.create(sprint);
+export function resetDb() {
+  Object.assign(db, seed());
+  saveDb();
+}
+export function enrichSprint(sprint: Omit<Sprint, 'issues'>): Sprint {
+  return {
+    ...sprint,
+    issues: db.issues
+      .filter(issue => issue.sprintId === sprint.id && issue.projectId === sprint.projectId)
+      .sort((a, b) => a.orderIndex - b.orderIndex),
+  };
+}
+export function notifyAssignment(issue: Issue, previousAssignee?: string | null) {
+  if (issue.assigneeUserId && issue.assigneeUserId !== previousAssignee) {
+    db.notifications.unshift({
+      id: crypto.randomUUID(),
+      userId: issue.assigneeUserId,
+      message: `${issue.issueNumber} has been assigned to you.`,
+      status: NotificationStatus.UNREAD,
+    });
+  }
 }

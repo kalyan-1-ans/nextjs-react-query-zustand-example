@@ -5,6 +5,7 @@ import { Notification, NotificationStatus } from './types';
 
 export const notificationsKeys = {
   all: ['notifications'] as const,
+  byUser: (userId: string) => ['notifications', userId] as const,
 };
 
 export const useNotificationsQuery = ({
@@ -14,8 +15,9 @@ export const useNotificationsQuery = ({
 } = {}) => {
   const currentUserId = useAuthStore.use.currentUserId() ?? '';
   return useQuery({
-    queryKey: notificationsKeys.all,
+    queryKey: notificationsKeys.byUser(currentUserId),
     queryFn: () => notificationApi.getNotifications(currentUserId),
+    enabled: !!currentUserId,
     select,
     staleTime: 1000 * 60 * 2,
     refetchInterval: 1000 * 60 * 2,

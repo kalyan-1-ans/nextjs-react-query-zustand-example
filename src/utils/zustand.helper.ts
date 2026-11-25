@@ -1,18 +1,15 @@
-import { StoreApi, UseBoundStore } from "zustand";
+import type { StoreApi, UseBoundStore } from 'zustand';
 
 type WithSelectors<S> = S extends { getState: () => infer T }
-  ? S & { use: { [K in keyof T]: () => T[K] } }
+  ? S & { use: { [K in keyof T]-?: () => T[K] } }
   : never;
 
 export const createSelectors = <S extends UseBoundStore<StoreApi<object>>>(
-  _store: S
-) => {
-  const store = _store as WithSelectors<typeof _store>;
-  store.use = {};
-  for (const k of Object.keys(store.getState())) {
-    // eslint-disable-next-line security/detect-object-injection
-    (store.use as any)[k] = () => store((s) => s[k as keyof typeof s]);
+  store: S,
+): WithSelectors<S> => {
+  const selectors: Record<string, () => unknown> = {};
+  for (const key of Object.keys(store.getState())) {
+    selectors[key] = () => store(state => state[key as keyof typeof state]);
   }
-
-  return store;
+  return Object.assign(store, { use: selectors }) as WithSelectors<S>;
 };

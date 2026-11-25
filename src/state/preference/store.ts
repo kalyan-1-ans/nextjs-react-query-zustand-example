@@ -3,23 +3,23 @@ import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { createSelectors } from '@/utils/zustand.helper';
 
-type UIPreferenceState = {
+type PreferenceState = {
   lastVisitedProjectId: string | undefined;
 };
 
-type UIPReferenceAction = {
+type PreferenceAction = {
   setLastVisitedProjectId: (projectId?: string) => void;
 };
 
-const initState: UIPreferenceState = {
+const initState: PreferenceState = {
   lastVisitedProjectId: undefined,
 };
 
-type UIPreferenceStateAndAction = UIPreferenceState & {
-  actions: UIPReferenceAction;
+type PreferenceStateAndAction = PreferenceState & {
+  actions: PreferenceAction;
 };
 
-const useUIPreferenceStoreBase = create<UIPreferenceStateAndAction>()(
+const usePreferenceStoreBase = create<PreferenceStateAndAction>()(
   persist(
     devtools(
       immer(set => ({
@@ -34,12 +34,14 @@ const useUIPreferenceStoreBase = create<UIPreferenceStateAndAction>()(
       })),
       {
         enabled: true,
-        name: 'ui-preference-store',
-        store: 'ui-preference-store',
+        name: 'preference-store',
+        store: 'preference-store',
       },
     ),
     {
+      // Keep the existing storage key so saved preferences survive this rename.
       name: 'ui-preference-store',
+      skipHydration: true,
       storage: createJSONStorage(() => localStorage),
       partialize: state => {
         return {
@@ -50,4 +52,4 @@ const useUIPreferenceStoreBase = create<UIPreferenceStateAndAction>()(
   ),
 );
 
-export const useUIPreferenceStore = createSelectors(useUIPreferenceStoreBase);
+export const usePreferenceStore = createSelectors(usePreferenceStoreBase);

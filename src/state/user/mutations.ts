@@ -1,30 +1,33 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { userApi } from './api';
 import { userKeys } from './queries';
+import type { User } from './types';
+import { useToastState } from '@/components/design-system/toast';
 
-export const useUpdateUserMutation = ({
+export function useUpdateUserMutation({
   onSettled,
   onSuccess,
-}: { onSettled?: () => void; onSuccess?: () => void } = {}) => {
-  const queryClient = useQueryClient();
-
+}: { onSettled?: () => void; onSuccess?: () => void } = {}) {
+  const client = useQueryClient();
   return useMutation({
-    mutationFn: (user: Partial<User>) => userApi.updateUser(user),
-    onMutate: async (user: Partial<User>) => {
-      const previousUser = user.id
-        ? queryClient.getQueryData<User>(userKeys.user(user.id))
-        : undefined;
-      if (user.id) {
-        queryClient.setQueryData(userKeys.user(user.id), user);
-      }
-      return { previousUser };
+    mutationFn: (user: Pick<User, 'id' | 'name'>) => userApi.updateUser(user),
+    onMutate: async user => {
+      await client.cancelQueries({ queryKey: userKeys.all });
+      const previous = client.getQueryData<User>(userKeys.user(user.id));
+      client.setQueryData<User>(userKeys.user(user.id), old => (old ? { ...old, ...user } : old));
+      return { previous };
     },
-    onError: (err, user, context) => {
-      if (user.id) {
-        queryClient.setQueryData(userKeys.user(user.id), context?.previousUser);
-      }
+    onError: (_error, user, context) => {
+      if (context?.previous) client.setQueryData(userKeys.user(user.id), context.previous);
     },
-    onSettled,
-    onSuccess,
+    onSuccess: user => {
+      client.setQueryData(userKeys.user(user.id), user);
+      useToastState.getState().addToast('Profile saved.');
+      onSuccess?.();
+    },
+    onSettled: async () => {
+      await client.invalidateQueries({ queryKey: userKeys.all });
+      onSettled?.();
+    },
   });
-};
+}

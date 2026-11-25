@@ -1,77 +1,48 @@
-import { useProjectIdParam } from '@/hooks/useProjectIdParam';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { sprintDialog } from '../ui-dialog';
+import { useProjectIdParam } from '@/hooks/useProjectIdParam';
+import { useToastState } from '@/components/design-system/toast';
 import { sprintApi } from './api';
 import { sprintKeys } from './queries';
-import { CreateSprintRequest, Sprint } from './type';
+import type { CreateSprintRequest, Sprint } from './type';
 
-export const useCreateSprintMutation = () => {
-  const { closeDialog } = sprintDialog.useDialogState();
-  const queryClient = useQueryClient();
+export function useCreateSprintMutation() {
+  const client = useQueryClient();
   const projectId = useProjectIdParam();
-
   return useMutation({
-    mutationFn: (request: CreateSprintRequest) =>
-      sprintApi.createSprint(projectId as string, request),
-    onSettled(data, error) {
-      if (!error) {
-        closeDialog();
-      }
-    },
-    onSuccess: async data => {
-      await queryClient.invalidateQueries({ queryKey: sprintKeys.byProjectId(data.projectId) });
+    mutationFn: (request: CreateSprintRequest) => sprintApi.createSprint(projectId, request),
+    onSuccess: async () => {
+      useToastState.getState().addToast('Sprint created.');
+      await client.invalidateQueries({ queryKey: sprintKeys.byProjectId(projectId) });
     },
   });
-};
-
-export const useCompleteSprintMutation = () => {
-  const queryClient = useQueryClient();
+}
+function useChangeSprintStatus(status: 'ACTIVE' | 'COMPLETED') {
+  const client = useQueryClient();
   const projectId = useProjectIdParam();
-
+  const key = sprintKeys.byProjectId(projectId);
   return useMutation({
-    mutationFn: (sprintId: string) =>
-      sprintApi.updateSprint(projectId, {
-        id: sprintId,
-        status: 'COMPLETED',
-        endDate: new Date(),
-      }),
-    onMutate: async sprintId => {
-      const previousSprints = queryClient.getQueryData<Sprint[]>(sprintKeys.byProjectId(projectId));
-      if (previousSprints) {
-        const updatedspints = previousSprints.map(sprint => {
-          if (sprint.id === sprintId) {
-            return { ...sprint, status: 'COMPLETING', endDate: new Date().toISOString() };
-          }
-          return sprint;
-        });
-        queryClient.setQueryData(sprintKeys.byProjectId(projectId), updatedspints);
-      }
+    mutationFn: (id: string) => sprintApi.updateSprint(projectId, { id, status }),
+    onMutate: async id => {
+      await client.cancelQueries({ queryKey: key });
+      const previous = client.getQueryData<Sprint[]>(key);
+      client.setQueryData<Sprint[]>(key, old =>
+        old?.map(sprint => (sprint.id === id ? { ...sprint, status } : sprint)),
+      );
+      return { previous };
     },
-  });
-};
-
-export const useStartSprintMutation = () => {
-  const queryClient = useQueryClient();
-  const projectId = useProjectIdParam();
-
-  return useMutation({
-    mutationFn: (sprintId: string) =>
-      sprintApi.updateSprint(projectId, {
-        id: sprintId,
-        status: 'ACTIVE',
-        startDate: new Date(),
-      }),
-    onMutate: async sprintId => {
-      const previousSprints = queryClient.getQueryData<Sprint[]>(sprintKeys.byProjectId(projectId));
-      if (previousSprints) {
-        const updatedspints = previousSprints.map(sprint => {
-          if (sprint.id === sprintId) {
-            return { ...sprint, status: 'ACTIVE', startDate: new Date().toISOString() };
-          }
-          return sprint;
-        });
-        queryClient.setQueryData(sprintKeys.byProjectId(projectId), updatedspints);
-      }
+    onError: (_error, _id, context) => {
+      if (context?.previous) client.setQueryData(key, context.previous);
     },
+    onSuccess: () =>
+      useToastState
+        .getState()
+        .addToast(status === 'ACTIVE' ? 'Sprint started.' : 'Sprint completed.'),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
   });
-};
+}
+export function useStartSprintMutation() {
+  return useChangeSprintStatus('ACTIVE');
+}
+export function useCompleteSprintMutation() {
+  return useChangeSprintStatus('COMPLETED');
+}

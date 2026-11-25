@@ -1,6 +1,5 @@
-import { Card, CardBody, Typography } from '@material-tailwind/react';
+import { Card, CardBody, Typography } from '@/components/design-system/ui';
 
-import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIssuesCountByProjectId } from '@/state/issue';
 
@@ -12,22 +11,22 @@ interface ProjectItemCardProps {
 
 export const ProjectItemCard = ({ name, subTitle, id }: ProjectItemCardProps) => {
   const router = useRouter();
-  const { data, isLoading, refetch } = useIssuesCountByProjectId(id);
-  const hasRefetchedRef = useRef(data ? false : true);
-
-  useEffect(() => {
-    if (!hasRefetchedRef.current) {
-      refetch();
-      hasRefetchedRef.current = true;
-    }
-  }, [refetch]);
+  const { data, isLoading } = useIssuesCountByProjectId(id);
 
   const handleClick = () => {
     router.push(`/project/${id}`);
   };
 
   return (
-    <Card className="mt-6 w-96 cursor-pointer" onClick={handleClick}>
+    <Card
+      className="mt-6 w-full max-w-sm cursor-pointer"
+      role="link"
+      tabIndex={0}
+      onKeyDown={event => {
+        if (event.key === 'Enter') handleClick();
+      }}
+      onClick={handleClick}
+    >
       <CardBody>
         <Typography variant="h5" color="blue-gray" className="mb-2">
           {name}

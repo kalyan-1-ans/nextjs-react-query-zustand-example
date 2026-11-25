@@ -1,15 +1,16 @@
 import { useAuthStore } from '@/state/auth';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { Button, Card, Input, Typography } from '@material-tailwind/react';
+import { Button, Card, Input, Typography } from '@/components/design-system/ui';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
+import { useEffect } from 'react';
 import { useCurrentUserQuery } from '../state/user';
 import { useUpdateUserMutation } from '../state/user/mutations';
 
 const schema = yup.object({
   email: yup.string(),
-  name: yup.string().required('Name is required'),
+  name: yup.string().trim().required('Name is required'),
 });
 
 type FormValues = yup.InferType<typeof schema>;
@@ -37,6 +38,10 @@ export function ProfileForm() {
     },
     disabled: isPending,
   });
+
+  useEffect(() => {
+    if (data?.id) reset({ email: data.email, name: data.name });
+  }, [data?.id, data?.email, data?.name, reset]);
 
   const onSubmit = (data: FormValues) => {
     mutate({
@@ -66,7 +71,8 @@ export function ProfileForm() {
           <div>
             <Input
               size="lg"
-              placeholder="name@mail.com"
+              aria-label="Your name"
+              placeholder="Your name"
               className=" !border-t-blue-gray-200 focus:!border-t-gray-900"
               labelProps={{
                 className: 'before:content-none after:content-none',
@@ -88,6 +94,7 @@ export function ProfileForm() {
             labelProps={{
               className: 'before:content-none after:content-none',
             }}
+            aria-label="Your email"
             {...register('email', { disabled: true })}
           />
         </div>

@@ -1,13 +1,9 @@
 'use client';
 
+import { ProjectDialogsProvider } from '@/components/project/ProjectDialogsProvider';
 import { SideNav } from '@/app/__layout/SideNav';
-import { ToastContainer } from '@/components/design-system/ToastContainer';
-import { IssueUpsertDialog } from '@/components/IssueUpsertDialog';
-import { SprintCompleteWarningDialog } from '@/components/SprintCompleteWarningDialog';
-import { SprintCreateDialog } from '@/components/SprintCreateDialog';
-import { SprintStartWarningDialog } from '@/components/SprintStartWarningDialog';
 import { useProjectIdParam } from '@/hooks/useProjectIdParam';
-import { useUIPreferenceStore } from '@/state/ui-preference';
+import { usePreferenceStore } from '@/state/preference';
 import React, { useEffect } from 'react';
 
 export default function ProjectLayout({
@@ -15,7 +11,7 @@ export default function ProjectLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { setLastVisitedProjectId } = useUIPreferenceStore.use.actions();
+  const { setLastVisitedProjectId } = usePreferenceStore.use.actions();
   const projectId = useProjectIdParam();
 
   useEffect(() => {
@@ -23,19 +19,13 @@ export default function ProjectLayout({
   }, [projectId, setLastVisitedProjectId]);
 
   return (
-    <>
-      <IssueUpsertDialog />
-      <SprintCreateDialog />
-      <SprintCompleteWarningDialog />
-      <SprintStartWarningDialog />
-
-      <section className="flex flex-1">
-        <div>
+    <ProjectDialogsProvider key={projectId}>
+      <section className="flex flex-1 flex-col gap-4 md:flex-row">
+        <div className="md:w-52 shrink-0">
           <SideNav />
         </div>
-        <ToastContainer />
-        <div className="px-8 md:px-8 py-8 w-full">{children}</div>
+        <div className="min-w-0 flex-1 py-4 md:px-6">{children}</div>
       </section>
-    </>
+    </ProjectDialogsProvider>
   );
 }

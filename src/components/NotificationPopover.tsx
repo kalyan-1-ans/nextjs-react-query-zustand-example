@@ -6,19 +6,17 @@ import {
   PopoverContent,
   PopoverHandler,
   Typography,
-} from '@material-tailwind/react';
-import React from 'react';
+} from '@/components/design-system/ui';
+import React, { useState } from 'react';
 import { useNotificationsQuery, useMarkAsReadMutation } from '../state/notification';
-import { notificationPopoverAtom } from '../state/ui-popover';
 import cx from 'classnames';
-import { useAtom } from 'jotai';
 import { Notification, NotificationStatus } from '@/state/notification/types';
 
 interface NotificationPopoverProps {
   children: React.ReactNode;
 }
 export const NotificationPopover = ({ children }: NotificationPopoverProps) => {
-  const [isOpen, setOpen] = useAtom(notificationPopoverAtom);
+  const [isOpen, setOpen] = useState(false);
   const { data, isLoading } = useNotificationsQuery();
   const markAsReadMutation = useMarkAsReadMutation();
 
@@ -31,7 +29,7 @@ export const NotificationPopover = ({ children }: NotificationPopoverProps) => {
   return (
     <Popover placement="bottom-end" open={isOpen} handler={setOpen}>
       <PopoverHandler>{children}</PopoverHandler>
-      <PopoverContent className="w-100">
+      <PopoverContent className="w-96">
         <List>
           {isLoading && (
             <div className="max-w-full animate-pulse">

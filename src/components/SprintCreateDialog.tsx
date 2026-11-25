@@ -1,3 +1,4 @@
+import { useProjectDialogs } from '@/components/project/useProjectDialogs';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { yupResolver } from '@hookform/resolvers/yup';
 import {
@@ -5,60 +6,60 @@ import {
   Dialog,
   DialogBody,
   DialogHeader,
+  DialogTitle,
   IconButton,
   Input,
   Textarea,
   Typography,
-} from '@material-tailwind/react';
-import { useForm } from 'react-hook-form';
+} from '@/components/design-system/ui';
+import { useForm, useWatch } from 'react-hook-form';
 import * as yup from 'yup';
 import { useCreateSprintMutation } from '../state/sprint/mutations';
 import DatePicker from './design-system/DatePicker';
-import { sprintDialog } from '../state/ui-dialog';
-import { useProjectIdParam } from '@/hooks/useProjectIdParam';
 
 const schema = yup.object({
-  name: yup.string().required('Name is required'),
+  name: yup.string().trim().required('Name is required'),
   goal: yup.string().required('Goal is required'),
   startDate: yup.date().required('Start date is required'),
-  endDate: yup.date().required('End date is required'),
+  endDate: yup
+    .date()
+    .min(yup.ref('startDate'), 'End date must follow start date')
+    .required('End date is required'),
 });
 
 type FormValues = yup.InferType<typeof schema>;
 
 const CreateSprintForm = () => {
-  const { closeDialog } = sprintDialog.useDialogState();
-  const projectId = useProjectIdParam();
-  // const [createSprint, { loading }] = useCreateSprintMutation();
-  const loading = false;
+  const { closeDialog } = useProjectDialogs();
+  const { mutate, isPending: loading } = useCreateSprintMutation();
 
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm({
     resolver: yupResolver(schema),
     disabled: loading,
   });
-  const selectedStartDate = watch('startDate');
-  const selectedEndDate = watch('endDate');
+  const selectedStartDate = useWatch({ control, name: 'startDate' });
+  const selectedEndDate = useWatch({ control, name: 'endDate' });
 
   const onSubmit = (data: FormValues) => {
-    // createSprint({
-    //   ...data,
-    //   projectId,
-    // });
+    mutate(data, { onSuccess: closeDialog });
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="false">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="off">
       <DialogHeader className="relative m-0 block">
-        <Typography variant="h4" color="blue-gray">
-          Create Sprint
-        </Typography>
+        <DialogTitle>
+          <Typography variant="h4" color="blue-gray">
+            Create Sprint
+          </Typography>
+        </DialogTitle>
         <IconButton
+          aria-label="Close dialog"
           size="sm"
           variant="text"
           className="!absolute right-3.5 top-3.5"
@@ -71,7 +72,7 @@ const CreateSprintForm = () => {
       <DialogBody className="space-y-8 pb-6">
         <div>
           <Input
-            label="Summary"
+            label="Name"
             error={!!errors.name}
             {...register('name')}
             containerProps={{ className: 'min-w-full' }}
@@ -130,7 +131,8 @@ const CreateSprintForm = () => {
 };
 
 export const SprintCreateDialog = () => {
-  const { isOpen, closeDialog } = sprintDialog.useDialogState();
+  const { dialog, closeDialog } = useProjectDialogs();
+  const isOpen = dialog?.type === 'sprint-create';
 
   return (
     <Dialog
@@ -140,7 +142,7 @@ export const SprintCreateDialog = () => {
       className="p-4"
       dismiss={{ outsidePress: false }}
     >
-      <CreateSprintForm />
+      {isOpen && <CreateSprintForm />}
     </Dialog>
   );
 };

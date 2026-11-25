@@ -1,192 +1,174 @@
+import { useProjectDialogs } from '@/components/project/useProjectDialogs';
 import {
-  Active,
   DndContext,
-  DragEndEvent,
-  DragOverEvent,
-  KeyboardSensor,
-  Over,
+  DragOverlay,
+  pointerWithin,
+  useDndContext,
+  type CollisionDetection,
   PointerSensor,
-  closestCorners,
+  KeyboardSensor,
   useSensor,
-  useSensors
+  useSensors,
+  useDroppable,
+  closestCorners,
+  type DragEndEvent,
 } from '@dnd-kit/core';
-import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Breadcrumbs, Button, Typography } from '@material-tailwind/react';
-import { useActiveSprintIssuesByStatusQuery, useActiveSprintQuery } from '../state/sprint';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { useState } from 'react';
+import { getBoardDropUpdate } from '@/utils/board.helper';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Breadcrumbs, Button, Typography } from './design-system/ui';
+import { useProjectIdParam } from '@/hooks/useProjectIdParam';
+import { useActiveSprintQuery } from '@/state/sprint';
+import { useCompleteSprintMutation } from '@/state/sprint/mutations';
+import { useUpdateIssueMutation } from '@/state/issue';
+import type { Issue, IssueStatus } from '@/state/issue/types';
+import { useProjectQuery } from '@/state/project';
+import { IssueDraggable, IssueDragPreview } from './IssueDraggable';
+import { KanbanBoardSkeleton } from './KanbanBoardSkeleton';
 
-import { useDroppable } from '@dnd-kit/core';
-import { IssueStatus } from '@generated/graphql';
-import { FC } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
-import { useUpdateIssueCache, useUpdateIssueMutation } from '../state/issue';
-import { useProjectQuery } from '../state/project';
-import { useCompleteSprintMutation } from '../state/sprint/mutations';
-import { issueDialog, sprintCompleteWarningDialog } from '../state/ui-dialog';
-import { IssueDraggable } from './IssueDraggable';
-
-const COLUMNS = [
-  {
-    id: IssueStatus.ToDo,
-    title: 'To Do'
-  },
-  {
-    id: IssueStatus.InProgress,
-    title: 'In Progress'
-  },
-  {
-    id: IssueStatus.Review,
-    title: 'Review'
-  },
-  {
-    id: IssueStatus.Done,
-    title: 'Done'
-  }
+const columns: { id: IssueStatus; title: string }[] = [
+  { id: 'TO_DO', title: 'To Do' },
+  { id: 'IN_PROGRESS', title: 'In Progress' },
+  { id: 'REVIEW', title: 'Review' },
+  { id: 'DONE', title: 'Done' },
 ];
+// Pointer drops must land inside a column; keyboard moves use geometric collisions.
+const boardCollisionDetection: CollisionDetection = args => {
+  if (!args.pointerCoordinates) return closestCorners(args);
+  const hits = pointerWithin(args);
+  const cards = hits.filter(hit => !columns.some(column => column.id === hit.id));
+  return cards.length ? cards : hits;
+};
 
-export type ColumnDroppableProps = {
+function Column({
+  id,
+  title,
+  issues,
+  disabled,
+}: {
   id: IssueStatus;
   title: string;
-  projectId: string;
-};
-
-const ColumnDroppable: FC<ColumnDroppableProps> = ({ id, title, projectId }) => {
-  const { data: issues } = useActiveSprintIssuesByStatusQuery({
-    projectId,
-    status: id
-  });
-  const { setNodeRef } = useDroppable({ id: id });
-
+  issues: Issue[];
+  disabled: boolean;
+}) {
+  const { setNodeRef } = useDroppable({ id, data: { status: id }, disabled });
+  const { over } = useDndContext();
+  const isOver = over?.data.current?.status === id;
   return (
-    <SortableContext id={id} items={issues ?? []} strategy={rectSortingStrategy}>
-      <div ref={setNodeRef} className="flex flex-col w-1/3 bg-gray-100 rounded-lg p-4 shadow-md">
-        <h4 className="text-lg font-bold mb-4 capitalize text-gray-700">{title}</h4>
-        {issues?.map((card) => (
-          <IssueDraggable key={card.id} issue={card} />
+    <SortableContext
+      id={id}
+      items={issues.map(issue => issue.id)}
+      strategy={verticalListSortingStrategy}
+    >
+      <section
+        ref={setNodeRef}
+        aria-label={title}
+        className={`min-h-80 min-w-60 flex-1 rounded-lg p-4 ${isOver ? 'bg-blue-100' : 'bg-gray-100'}`}
+      >
+        <h2 className="mb-4 font-bold">
+          {title} <span className="text-gray-500">{issues.length}</span>
+        </h2>
+        {issues.map(issue => (
+          <IssueDraggable key={issue.id} issue={issue} disabled={disabled} />
         ))}
-      </div>
+      </section>
     </SortableContext>
   );
-};
-
+}
 export function KanbanBoard() {
-  const { projectId = '' } = useParams();
-  const { data } = useActiveSprintQuery({ projectId: projectId ?? '' });
-  const [updateIssue] = useUpdateIssueMutation({ showNotificationOnUpdate: false });
-  const { updateIssueCache } = useUpdateIssueCache();
-  const { openDialog: openWarningDialog } = sprintCompleteWarningDialog.useDialogState();
-  const [completeSprint, { loading }] = useCompleteSprintMutation();
-  const navigate = useNavigate();
-  const { openDialog: openUpsertIssueDialog } = issueDialog.useDialogState();
-  const selectedProject = useProjectQuery(projectId);
-
-  const findColumnId = (unique: string | null) => {
-    if (!unique) {
-      return null;
-    }
-    const matchingColumn = COLUMNS.find((c) => c.id === unique);
-    if (matchingColumn) {
-      return matchingColumn.id;
-    }
-    const matchingIssue = data?.issues?.find((c) => c.id === unique);
-    if (matchingIssue) {
-      return matchingIssue.status;
-    }
-  };
-
-  const updateLocalCache = (active: Active, over: Over | null) => {
-    const activeId = String(active.id);
-    const overId = over ? String(over.id) : null;
-    if (activeId === overId) {
-      return;
-    }
-
-    const overColumnId = findColumnId(overId);
-    const activeColumnId = findColumnId(activeId);
-    if (!overColumnId) {
-      return;
-    }
-    if (activeColumnId === overColumnId) {
-      return;
-    }
-    const matchingIssue = data?.issues?.find((i) => i.id === activeId);
-    if (!matchingIssue) {
-      return;
-    }
-    updateIssueCache(matchingIssue, overColumnId);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    updateLocalCache(active, over);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    updateLocalCache(active, over);
-    const activeId = String(active.id);
-    const columnId = findColumnId(activeId);
-    if (columnId) {
-      updateIssue({
-        id: activeId,
-        status: columnId
-      });
-    }
-  };
-
+  const projectId = useProjectIdParam();
+  const { data: sprint, isLoading, error, refetch } = useActiveSprintQuery({ projectId });
+  const { data: project } = useProjectQuery(projectId);
+  const update = useUpdateIssueMutation({ showNotification: false });
+  const complete = useCompleteSprintMutation();
+  const router = useRouter();
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeIssue = sprint?.issues.find(issue => issue.id === activeId);
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-
-  const handleCompleteSprint = () => {
-    const hasPendingIssues = data?.issues?.some((issue) => issue.status !== IssueStatus.Done) ?? false;
-    if (hasPendingIssues) {
-      openWarningDialog();
+  const { openIssueDialog: openDialog, showCompleteSprintWarning } = useProjectDialogs();
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveId(null);
+    if (!over || update.isPending || !sprint) return;
+    const input = getBoardDropUpdate(sprint.issues, String(active.id), String(over.id));
+    if (input) update.mutate(input);
+  };
+  const handleComplete = () => {
+    if (!sprint) return;
+    if (sprint.issues.some(issue => issue.status !== 'DONE')) {
+      showCompleteSprintWarning();
     } else {
-      completeSprint(data?.id ?? '', { onCompleted: () => navigate('../issues') });
+      complete.mutate(sprint.id, { onSuccess: () => router.push(`/project/${projectId}`) });
     }
   };
-
-  const handleCreateIssue = () => {
-    openUpsertIssueDialog();
-  };
-
+  if (isLoading) return <KanbanBoardSkeleton />;
+  if (error)
+    return (
+      <div role="alert">
+        Unable to load sprint.{' '}
+        <button onClick={() => refetch()} className="underline">
+          Retry
+        </button>
+      </div>
+    );
+  if (!sprint)
+    return (
+      <div>
+        <Typography variant="h3">No active sprint</Typography>
+        <Link className="mt-4 inline-block underline" href={`/project/${projectId}`}>
+          View issues and start a sprint
+        </Link>
+      </div>
+    );
   return (
-    <div className="h-full w-full">
-      <Breadcrumbs className="mb-2">
-        <Link to="/">Projects</Link>
-        <span>{selectedProject?.data?.name}</span>
+    <div className="w-full">
+      <Breadcrumbs className="mb-4">
+        <Link href="/dashboard">Projects</Link>
+        <Link href={`/project/${projectId}`}>{project?.name}</Link>
         <span>Active Sprint</span>
       </Breadcrumbs>
-      <div className="flex items-center w-full">
+      <div className="flex flex-wrap items-center gap-4">
         <div>
-          <Typography variant="h3">{data?.name}</Typography>
-          <Typography variant="lead" className="text-gray-500 text-md">
-            {data?.goal}
-          </Typography>
+          <Typography variant="h3">{sprint.name}</Typography>
+          <Typography className="text-gray-600">{sprint.goal}</Typography>
         </div>
-        <div className="ml-auto flex gap-4">
-          <Button variant="filled" onClick={handleCreateIssue}>
-            Create Issue
-          </Button>
-          <Button variant="outlined" onClick={handleCompleteSprint} loading={loading}>
+        <div className="ml-auto flex gap-3">
+          <Button onClick={() => openDialog()}>Create Issue</Button>
+          <Button variant="outlined" loading={complete.isPending} onClick={handleComplete}>
             Complete Sprint
           </Button>
         </div>
       </div>
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragOver={handleDragOver}
+        collisionDetection={boardCollisionDetection}
+        onDragStart={({ active }) => setActiveId(String(active.id))}
+        onDragCancel={() => setActiveId(null)}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 mt-6 h-full">
-          {COLUMNS.map((column) => (
-            <ColumnDroppable key={column.id} id={column.id} title={column.title} projectId={projectId ?? ''} />
+        <div className="mt-6 flex gap-4 overflow-x-auto">
+          {columns.map(column => (
+            <Column
+              key={column.id}
+              {...column}
+              disabled={update.isPending}
+              issues={sprint.issues
+                .filter(issue => issue.status === column.id)
+                .sort((a, b) => a.orderIndex - b.orderIndex)}
+            />
           ))}
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeIssue ? <IssueDragPreview issue={activeIssue} /> : null}
+        </DragOverlay>
       </DndContext>
     </div>
   );

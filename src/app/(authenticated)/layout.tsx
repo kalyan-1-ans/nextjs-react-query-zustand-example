@@ -1,6 +1,5 @@
 'use client';
 
-import { ToastContainer } from '@/components/design-system/ToastContainer';
 import { useAuthStore } from '@/state/auth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -16,19 +15,20 @@ export default function AuthenticatedLayout({
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [isAuthenticated, router]);
+
+  if (!isAuthenticated) return null;
 
   return (
     <main className="min-h-screen flex flex-col">
       <header>
         <MainNav />
       </header>
-      <main className="flex flex-1">
-        <ToastContainer />
-        <div className="px-8 md:px-8 py-8 w-full">{children}</div>
-      </main>
+      <div className="flex flex-1">
+        <div className="px-4 md:px-8 py-8 w-full min-w-0">{children}</div>
+      </div>
     </main>
   );
 }

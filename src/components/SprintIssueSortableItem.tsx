@@ -1,8 +1,9 @@
-import { Issue } from '@generated/graphql';
-import { issueDialog } from '../state/ui-dialog';
+import { useProjectDialogs } from '@/components/project/useProjectDialogs';
+import { useUsersQuery } from '@/state/user';
+import { Issue } from '@/state/issue/types';
 import { ISSUE_TYPE_COLOR } from '../utils/constants';
-import { Typography } from '@material-tailwind/react';
-import Avatar from 'react-avatar';
+import { Typography } from '@/components/design-system/ui';
+import Avatar from '@/components/design-system/InitialsAvatar';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -12,9 +13,14 @@ interface SprintIssueItemProps {
 }
 
 export const SprintIssueSortableItem = ({ issue, classes }: SprintIssueItemProps) => {
-  const { summary, issueNumber, status, assignee, storyPoints } = issue;
-  const { openDialog } = issueDialog.useDialogState();
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: issue.id });
+  const { summary, issueNumber, status, assigneeUserId, storyPoints } = issue;
+  const { data: users } = useUsersQuery();
+  const assignee = users?.find(user => user.id === assigneeUserId);
+  const { openIssueDialog: openDialog } = useProjectDialogs();
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition } =
+    useSortable({
+      id: issue.id,
+    });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -31,18 +37,35 @@ export const SprintIssueSortableItem = ({ issue, classes }: SprintIssueItemProps
       className="hover:bg-gray-50 cursor-pointer"
       onDoubleClick={handleIssueDbClick}
       style={style}
-      {...attributes}
-      {...listeners}
     >
-      <td className={`${classes} w-1/3 flex gap-2 items-center`}>
-        <div className={`w-3 h-3 ${ISSUE_TYPE_COLOR[issue?.type]}`} />
-        <Typography variant="small" className="font-normal">
-          {issueNumber}
-        </Typography>
+      <td className={`${classes} whitespace-nowrap`}>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            aria-label={`Drag issue ${issueNumber}`}
+            className="touch-none cursor-grab rounded px-1 focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            ⠿
+          </button>
+          <div className={`w-3 h-3 ${ISSUE_TYPE_COLOR[issue?.type]}`} />
+          <Typography variant="small" className="font-normal">
+            {issueNumber}
+          </Typography>
+        </div>
       </td>
       <td className={`${classes} w-1/2`}>
         <Typography variant="small" className="font-normal">
-          {summary}
+          <button
+            type="button"
+            className="text-left hover:underline"
+            onClick={handleIssueDbClick}
+            onPointerDown={event => event.stopPropagation()}
+          >
+            {summary}
+          </button>
         </Typography>
       </td>
       <td className={`${classes}  w-1/6`}>
@@ -58,7 +81,7 @@ export const SprintIssueSortableItem = ({ issue, classes }: SprintIssueItemProps
           <Typography
             variant="small"
             color="blue-gray"
-            className="font-normal bg-gray-500 w-6 text-center rounded-full"
+            className="font-normal bg-gray-600 text-white w-6 text-center rounded-full"
           >
             {storyPoints ?? 0}
           </Typography>

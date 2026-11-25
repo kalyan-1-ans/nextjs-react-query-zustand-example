@@ -1,11 +1,21 @@
-import { Typography } from '@material-tailwind/react';
+import { Typography } from '@/components/design-system/ui';
 import { useProjectsQuery } from '../../state/project';
 import { Divider } from '../design-system/Divider';
 import { ProjectItemCard } from './ProjectItemCard';
 import { ProjectItemSkeleton } from './ProjectItemSkeleton';
 
 export const ProjectList = () => {
-  const { ownedProjects, otherProjects, isLoading, error } = useProjectsQuery();
+  const { ownedProjects, otherProjects, isLoading, error, refetch } = useProjectsQuery();
+
+  if (error)
+    return (
+      <div role="alert">
+        Unable to load projects.{' '}
+        <button className="underline" onClick={() => refetch()}>
+          Retry
+        </button>
+      </div>
+    );
 
   return (
     <>

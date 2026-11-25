@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuthStore } from '@/state/auth';
-import { Spinner } from '@material-tailwind/react';
+import { Spinner } from '@/components/design-system/ui';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -11,11 +11,11 @@ export default function IndexPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } else {
-      router.push('/login');
+      router.replace('/login');
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">

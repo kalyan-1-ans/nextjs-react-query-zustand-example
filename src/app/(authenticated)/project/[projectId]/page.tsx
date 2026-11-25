@@ -6,14 +6,22 @@ import { useProjectIdParam } from '@/hooks/useProjectIdParam';
 import { useBacklogIssuesQuery } from '@/state/issue';
 import { useProjectQuery } from '@/state/project';
 import { useCompletedSprintsQuery, useUnCompletedSprintsQuery } from '@/state/sprint';
-import { issueDialog, sprintDialog } from '@/state/ui-dialog';
-import { Breadcrumbs, Button, Typography } from '@material-tailwind/react';
+import { useProjectDialogs } from '@/components/project/useProjectDialogs';
+import { Breadcrumbs, Button, Typography } from '@/components/design-system/ui';
 import Link from 'next/link';
 
 export default function IssuesPage() {
   const projectId = useProjectIdParam();
-  const { data: backlogData, isLoading: isBacklogLoading } = useBacklogIssuesQuery(projectId);
-  const { data: sprintsData, isLoading: isSprintLoading } = useUnCompletedSprintsQuery({
+  const {
+    data: backlogData,
+    isLoading: isBacklogLoading,
+    error: backlogError,
+  } = useBacklogIssuesQuery(projectId);
+  const {
+    data: sprintsData,
+    isLoading: isSprintLoading,
+    error: sprintError,
+  } = useUnCompletedSprintsQuery({
     projectId: projectId,
   });
   const { data: completedData, isLoading: isCompletedSprintLoading } = useCompletedSprintsQuery({
@@ -21,23 +29,32 @@ export default function IssuesPage() {
   });
   const loadingSprints = isBacklogLoading || isSprintLoading || isCompletedSprintLoading;
   const hasData = !!backlogData?.length || !!sprintsData?.length || !!completedData?.length;
-  const { data: selectedProjectData } = useProjectQuery(projectId);
+  const { data: selectedProjectData, error: projectError } = useProjectQuery(projectId);
 
-  const { openDialog } = issueDialog.useDialogState();
-  const { openDialog: openSprintDialog } = sprintDialog.useDialogState();
+  const { openIssueDialog: openDialog, openSprintDialog } = useProjectDialogs();
 
   const handleCreateIssueClick = () => {
     openDialog();
   };
 
+  if (projectError || backlogError || sprintError)
+    return (
+      <div role="alert">
+        Unable to load this project.{' '}
+        <Link href="/dashboard" className="underline">
+          Return to projects
+        </Link>
+      </div>
+    );
+
   return (
     <div>
       <Breadcrumbs className="mb-2">
-        <Link href="/">Projects</Link>
+        <Link href="/dashboard">Projects</Link>
         <span>{selectedProjectData?.name}</span>
         <span>Issues</span>
       </Breadcrumbs>
-      <div className="flex items-center w-full mb-6">
+      <div className="flex flex-wrap gap-4 items-center w-full mb-6">
         <div>
           <Typography variant="h3">Issues</Typography>
         </div>
