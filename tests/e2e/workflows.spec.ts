@@ -160,3 +160,24 @@ test('board dragging, ordering, notifications and sprint lifecycle', async ({ pa
   await page.getByRole('button', { name: 'Active Sprint', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Hori-FY2025-3', exact: true })).toBeVisible();
 });
+
+test('disposes project dialogs when leaving a project', async ({ page }) => {
+  await login(page);
+  await page.getByText('HorizonSync', { exact: true }).click();
+  await expect(page).toHaveURL('/project/1');
+  await page.getByRole('button', { name: 'Create Issue', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Create Issue', exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL('/dashboard');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByText('QuantumLeap', { exact: true }).click();
+  await expect(page).toHaveURL('/project/2');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Create Sprint', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Create Sprint', exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL('/dashboard');
+  await page.getByText('QuantumLeap', { exact: true }).click();
+  await expect(page).toHaveURL('/project/2');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});

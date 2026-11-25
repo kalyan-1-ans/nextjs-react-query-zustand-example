@@ -29,7 +29,7 @@ Open http://localhost:3000. Sign in with `johndoe@example.com` and password `Sum
 
 **TanStack Query** owns fetched users, projects, issues, sprints, and notifications. Mutations invalidate related lists/counts; issue, sprint, profile, and notification updates use optimistic cache updates with rollback on failure. Notification query keys include the signed-in user, and logout cancels requests and clears the cache.
 
-**Zustand** owns authentication, UI preferences, dialogs, toasts, and popovers. Session state uses `sessionStorage`; the last visited project preference uses `localStorage`. Providers hydrate persisted stores and await MSW startup before mounting data-fetching screens. The root layout remains a Server Component.
+**Zustand** owns authentication and persisted preferences. The notification popover keeps its open state locally. A project-scoped React provider owns issue and sprint dialogs and resets them when leaving or switching projects. Shared toast state lives alongside its components in `components/design-system/toast`. Session state uses `sessionStorage`; the last visited project preference uses `localStorage`. Providers hydrate persisted stores and await MSW startup before mounting data-fetching screens. The root layout remains a Server Component.
 
 **MSW** intercepts REST requests in the browser. Its typed in-memory database is seeded from `mocks/data/*.json`; changes are saved to the current tab's `sessionStorage` and survive reloads. Close the tab or clear session storage to reset the demo. This is an example app with simulated authentication, not a production backend or security boundary.
 
