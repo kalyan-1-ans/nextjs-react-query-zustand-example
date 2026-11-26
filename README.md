@@ -31,7 +31,7 @@ Open http://localhost:3000. Sign in with `johndoe@example.com` and password `Sum
 
 **Zustand** owns authentication and persisted preferences. The notification popover keeps its open state locally. A project-scoped React provider owns issue and sprint dialogs and resets them when leaving or switching projects. Shared toast state lives alongside its components in `components/design-system/toast`. Session state uses `sessionStorage`; the last visited project preference uses `localStorage`. Providers hydrate persisted stores and await MSW startup before mounting data-fetching screens. The root layout remains a Server Component.
 
-**MSW** intercepts REST requests in the browser. Its typed in-memory database is seeded from `mocks/data/*.json`; changes are saved to the current tab's `sessionStorage` and survive reloads. Close the tab or clear session storage to reset the demo. This is an example app with simulated authentication, not a production backend or security boundary.
+**MSW** intercepts REST requests in the browser. Content reads wait 2 seconds; authentication and writes do not. Its typed in-memory database is seeded from `mocks/data/*.json`; changes are saved to the current tab's `sessionStorage` and survive reloads. Close the tab or clear session storage to reset the demo. This is an example app with simulated authentication, not a production backend or security boundary.
 
 To use your own REST backend, copy `.env.example` to `.env.local`, set `NEXT_PUBLIC_ENABLE_API_MOCKING=false`, and configure `NEXT_PUBLIC_API_BASE_URL`. Restart Next.js after changing these public environment variables. The backend must implement these routes and enforce authentication/authorization:
 

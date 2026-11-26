@@ -1,6 +1,7 @@
 'use client';
 
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Spinner } from '@/components/design-system/ui';
 import { useEffect, useState } from 'react';
 import { createQueryClient } from '@/utils/client.helper';
@@ -53,6 +54,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         </div>
       )}
       <ToastContainer />
+      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 }
